@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">DateUI</string>
+    <!-- manifast와 여기에도 인증키 값을 넣어야 합니다. -->
+    <string name="google_maps_key" templateMergeStrategy="preserve" translatable="false">AIzaSyB0xvqeL3QtDlKcVhGXo7sHodCUMxEzrCA</string>
 </resources>

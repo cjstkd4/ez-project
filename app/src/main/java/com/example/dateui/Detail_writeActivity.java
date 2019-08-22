@@ -3,14 +3,10 @@ package com.example.dateui;
 import android.Manifest;
 import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
-import android.content.Context;
 import android.content.DialogInterface;
 import android.content.pm.PackageManager;
-import android.location.Criteria;
-import android.location.Location;
-import android.location.LocationListener;
-import android.location.LocationManager;
-import android.support.annotation.NonNull;
+import android.location.Address;
+import android.location.Geocoder;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -19,31 +15,31 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.DatePicker;
 import android.widget.EditText;
+import android.widget.SearchView;
 import android.widget.TimePicker;
-import android.widget.Toast;
 
 import com.example.dateui.helper.DateTimeHelper;
-import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
-import com.google.android.gms.maps.MapFragment;
 import com.google.android.gms.maps.OnMapReadyCallback;
+import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
-public class Detail_writeActivity extends AppCompatActivity implements View.OnClickListener, LocationListener, OnMapReadyCallback {
+import java.io.IOException;
+import java.util.List;
+
+public class Detail_writeActivity extends AppCompatActivity implements View.OnClickListener, OnMapReadyCallback {
     // 객체 선언
     EditText detail_write_name, detail_write_person, detail_write_help;
     Button detail_write_date, detail_write_time, detail_write_bt1, detail_write_bt2;
     int YEAR =0, MONTH =0, DAY = 0;
     int HOUR = 0, MINIUTE=0;
 
-    GoogleMap googleMap;
-    MapFragment fragment;
-    LocationManager lm;                 // 위치 관리자
+    private GoogleMap map;
+    SupportMapFragment mapFragment;
+    SearchView searchView;
     boolean permissionCK = false;    // 퍼미션 결과 저장
-    Marker marker;                      // 지도에 표시할 마커 객체
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -68,13 +64,37 @@ public class Detail_writeActivity extends AppCompatActivity implements View.OnCl
         MINIUTE = time[1];
 
 
-        // 객체 초기화
-        // 줄 그은 것은 곧 사라지지만 옛 버전을 사용하기 위해서 사용하는 것이 좋다.
-        // 단, 신버전의 사용 방법을 알고 있다면 그것을 사용하는 것이 좋다!
-        fragment = (MapFragment) getFragmentManager().findFragmentById(R.id.fragment);
-        lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-        // 구글맵 초기화
-        fragment.getMapAsync(this);
+        // 지도
+        searchView = findViewById(R.id.searchView);
+        mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
+        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+                String location = searchView.getQuery().toString();
+                List<Address> addressesList = null;
+
+                if(location != null || !location.equals("")){
+                    Geocoder geocoder = new Geocoder(Detail_writeActivity.this);
+                    try{
+                        addressesList = geocoder.getFromLocationName(location, 1);
+                    }catch (IOException e){
+                        e.printStackTrace();
+                    }
+                    Address address = addressesList.get(0);
+                    LatLng latLng = new LatLng(address.getLatitude(), address.getLongitude());
+                    map.addMarker(new MarkerOptions().position(latLng).title(location));
+                    map.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 10));
+                }
+                return false;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                return false;
+            }
+        });
+
+        mapFragment.getMapAsync(this);
 
         detail_write_date.setOnClickListener(this);
         detail_write_time.setOnClickListener(this);
@@ -96,12 +116,6 @@ public class Detail_writeActivity extends AppCompatActivity implements View.OnCl
             permissionCK = true;
         }
     }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        readyMap();
-    }
-
     @Override
     public void onClick(View v) {
         switch (v.getId()){
@@ -190,85 +204,8 @@ public class Detail_writeActivity extends AppCompatActivity implements View.OnCl
         dialog.show();
     }
 
-
-    // 지정된 시간, 거리마다 한번식 호출된다.
-    @Override
-    public void onLocationChanged(Location location) {
-        //현재 위도와 경도 얻기
-        double lat = location.getLatitude();    // 위도
-        double lng = location.getLongitude();   // 경도
-        /* 구글맵에 위치 설정하기 */
-//        현재 위치 관리 객체
-        LatLng position = new LatLng(lat, lng);
-//        마커 표시
-        if(marker == null) { //마커가 없는 경우, 새로 생성하여 지도에 추가
-            MarkerOptions options = new MarkerOptions();
-            options.position(position);
-            marker = googleMap.addMarker(options);
-        } else {
-            marker.setPosition(position);
-        }
-//        지도 배율 설정 : zoom : 1 ~ 21 (값이 커질수록 확대)
-        CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngZoom(position, 19);
-//        현재 위치로 앱 이동
-        googleMap.animateCamera(cameraUpdate);
-    }
-
-    @Override
-    public void onStatusChanged(String provider, int status, Bundle extras) {
-
-    }
-
-    @Override
-    public void onProviderEnabled(String provider) {
-
-    }
-
-    @Override
-    public void onProviderDisabled(String provider) {
-
-    }
-
     @Override
     public void onMapReady(GoogleMap googleMap) {
-        // 초기화된 구글
-        this.googleMap = googleMap;
-        if (permissionCK)
-            readyMap();
-    }
-
-    // 위치 수신 준비
-    private void readyMap() {
-        // 현재 사용가능한 하드웨어 이름 얻기 : GPS, NETWORK 값을 동기에 가져오기 가능
-        String provider = lm.getBestProvider(new Criteria(), true);
-        if (provider == null) {
-            Toast.makeText(this, "위치 정보를 사용할 상태가 아닙니다.", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        // 해당 장치가 마지막으로 수신한 위치 얻기
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            // TODO: Consider calling
-            //    ActivityCompat#requestPermissions
-            // here to request the missing permissions, and then overriding
-            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            //                                          int[] grantResults)
-            // to handle the case where the user grants the permission. See the documentation
-            // for ActivityCompat#requestPermissions for more details.
-            return;
-        }
-        Location location = lm.getLastKnownLocation(provider);
-        if(location != null){
-            onLocationChanged(location);    // 이벤트 함수 강제 호출
-        }
-        // 위치 정보 취득시작
-        // (하드웨어 이름, 갱신시간주기, 갱신거리주기, 이벤트 핸들러)
-        lm.requestLocationUpdates(provider, 1000, 1, this);
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        // 위치정보 수신 종료
-        lm.removeUpdates(this);
+        map = googleMap;
     }
 }
